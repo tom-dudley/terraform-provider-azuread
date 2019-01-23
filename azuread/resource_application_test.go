@@ -189,10 +189,11 @@ func testAccADApplication_availableToOtherTenants(id string) string {
 	return fmt.Sprintf(`
 resource "azuread_application" "test" {
   name                       = "acctest%s"
-  identifier_uris            = ["https://%s.hashicorptest.com"]
+  identifier_uris            = ["urn:amazon:cognito:sp:us-east-1_YUXXXXX"]
+  reply_urls                 = ["https://111.111.205.10:443/SAML20/SP"]
   available_to_other_tenants = true
 }
-`, id, id)
+`, id)
 }
 
 func testAccADApplication_complete(id string) string {

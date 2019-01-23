@@ -47,7 +47,7 @@ func resourceApplication() *schema.Resource {
 				MinItems: 1,
 				Elem: &schema.Schema{
 					Type:         schema.TypeString,
-					ValidateFunc: validate.URLIsHTTPOrHTTPS,
+					ValidateFunc: validate.NoEmptyStrings,
 				},
 			},
 
