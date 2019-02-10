@@ -15,6 +15,7 @@ func resourceGroup() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceGroupCreate,
 		Read:   resourceGroupRead,
+		Update: resourceGroupUpdate,
 		Delete: resourceGroupDelete,
 		Importer: &schema.ResourceImporter{
 			State: schema.ImportStatePassthrough,
@@ -26,6 +27,13 @@ func resourceGroup() *schema.Resource {
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.NoZeroValues,
+			},
+			"members": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
 			},
 		},
 	}
@@ -51,7 +59,49 @@ func resourceGroupCreate(d *schema.ResourceData, meta interface{}) error {
 
 	d.SetId(*group.ObjectID)
 
+	members := d.Get("members").(*schema.Set)
+	err = addMembers(*group.ObjectID, members, meta)
+
+	if err != nil {
+		return err
+	}
+
 	return resourceGroupRead(d, meta)
+}
+
+func addMembers(groupID string, members *schema.Set, meta interface{}) error {
+	client := meta.(*ArmClient).groupsClient
+	ctx := meta.(*ArmClient).StopContext
+
+	for _, member := range members.List() {
+		user, err := userRead(member.(string), meta)
+		if err != nil {
+			return err
+		}
+
+		tenantID := meta.(*ArmClient).tenantID
+		memberURL := "https://graph.windows.net/" + tenantID + "/directoryObjects/" + *user.ObjectID
+		parameters := graphrbac.GroupAddMemberParameters{URL: &memberURL}
+		client.AddMember(ctx, groupID, parameters)
+	}
+
+	return nil
+}
+
+func removeMembers(groupID string, members *schema.Set, meta interface{}) error {
+	client := meta.(*ArmClient).groupsClient
+	ctx := meta.(*ArmClient).StopContext
+
+	for _, member := range members.List() {
+		user, err := userRead(member.(string), meta)
+		if err != nil {
+			return err
+		}
+
+		client.RemoveMember(ctx, groupID, *user.ObjectID)
+	}
+
+	return nil
 }
 
 func resourceGroupRead(d *schema.ResourceData, meta interface{}) error {
@@ -70,6 +120,22 @@ func resourceGroupRead(d *schema.ResourceData, meta interface{}) error {
 	}
 
 	d.Set("name", resp.DisplayName)
+
+	return nil
+}
+
+func resourceGroupUpdate(d *schema.ResourceData, meta interface{}) error {
+	if d.HasChange("members") {
+		o, n := d.GetChange("members")
+		oldMembers := o.(*schema.Set)
+		newMembers := n.(*schema.Set)
+
+		removedMembers := oldMembers.Difference(newMembers)
+		addedMembers := newMembers.Difference(oldMembers)
+
+		removeMembers(d.Id(), removedMembers, meta)
+		addMembers(d.Id(), addedMembers, meta)
+	}
 
 	return nil
 }

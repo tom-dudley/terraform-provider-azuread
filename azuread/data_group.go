@@ -22,6 +22,13 @@ func dataGroup() *schema.Resource {
 				Required:     true,
 				ValidateFunc: validate.NoEmptyStrings,
 			},
+			"members": {
+				Type:     schema.TypeSet,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
 		},
 	}
 }

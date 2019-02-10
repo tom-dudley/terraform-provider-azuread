@@ -47,26 +47,10 @@ func dataSourceUser() *schema.Resource {
 	}
 }
 
-func dataSourceUserRead(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*ArmClient).usersClient
-	ctx := meta.(*ArmClient).StopContext
-
-	var user graphrbac.User
-
+func dataSourceUserRead(d *schema.ResourceData, meta interface{}) (err error) {
 	queryString := d.Get("user_principal_name").(string)
 
-	log.Printf("[DEBUG] Using Get with the following query string: %q", queryString)
-	user, err := client.Get(ctx, queryString)
-	if err != nil {
-		if ar.ResponseWasNotFound(user.Response) {
-			return fmt.Errorf("Error: No AzureAD User found with the following query string: %q", queryString)
-		}
-		return fmt.Errorf("Error making Read request on AzureAD User the following query string: %q: %+v", queryString, err)
-	}
-
-	if user.ObjectID == nil {
-		return fmt.Errorf("User objectId is nil")
-	}
+	user, err := userRead(queryString, meta)
 
 	d.SetId(*user.ObjectID)
 	d.Set("user_principal_name", user.UserPrincipalName)
@@ -75,5 +59,28 @@ func dataSourceUserRead(d *schema.ResourceData, meta interface{}) error {
 	d.Set("mail", user.Mail)
 	d.Set("mail_nickname", user.MailNickname)
 
-	return nil
+	return
+}
+
+func userRead(queryString string, meta interface{}) (user graphrbac.User, err error) {
+	client := meta.(*ArmClient).usersClient
+	ctx := meta.(*ArmClient).StopContext
+
+	log.Printf("[DEBUG] Using Get with the following query string: %q", queryString)
+	user, err = client.Get(ctx, queryString)
+	if err != nil {
+		if ar.ResponseWasNotFound(user.Response) {
+			err = fmt.Errorf("Error: No AzureAD User found with the following query string: %q", queryString)
+			return
+		}
+		err = fmt.Errorf("Error making Read request on AzureAD User the following query string: %q: %+v", queryString, err)
+		return
+	}
+
+	if user.ObjectID == nil {
+		err = fmt.Errorf("User objectId is nil")
+		return
+	}
+
+	return user, nil
 }
